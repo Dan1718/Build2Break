@@ -8,6 +8,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, confusion_matrix
 import joblib
 
+
 def extract_mfcc_features(audio_path, n_mfcc=13, n_fft=2048, hop_length=512):
     try:
         audio_data, sr = librosa.load(audio_path, sr=None)
@@ -15,8 +16,11 @@ def extract_mfcc_features(audio_path, n_mfcc=13, n_fft=2048, hop_length=512):
         print(f"Error loading audio file {audio_path}: {e}")
         return None
 
-    mfccs = librosa.feature.mfcc(y=audio_data, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length)
+    mfccs = librosa.feature.mfcc(
+        y=audio_data, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length
+    )
     return np.mean(mfccs.T, axis=0)
+
 
 def create_dataset(directory, label):
     X, y = [], []
@@ -26,6 +30,8 @@ def create_dataset(directory, label):
         if mfcc_features is not None:
             X.append(mfcc_features)
             y.append(label)
+            if (len(X))==2000:
+                break
             print(f"{len(X)}")
         else:
             print(f"Skipping audio file {audio_path}")
@@ -40,7 +46,7 @@ def train_model(X, y):
     print("Unique classes in y_train:", unique_classes)
 
     if len(unique_classes) < 2:
-        raise ValueError("Atleast 2 set is required to train")
+        raise ValueError("At least 2 sets are required to train")
 
     print("Size of X:", X.shape)
     print("Size of y:", y.shape)
@@ -51,7 +57,9 @@ def train_model(X, y):
         X_train, y_train = X, y
         X_test, y_test = None, None
     else:
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
 
         print("Size of X_train:", X_train.shape)
         print("Size of X_test:", X_test.shape)
@@ -61,12 +69,12 @@ def train_model(X, y):
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
 
+    # Train SVM with probability support
+    svm_classifier = SVC(kernel="linear", random_state=42, probability=True)
+    svm_classifier.fit(X_train_scaled, y_train)
+
     if X_test is not None:
         X_test_scaled = scaler.transform(X_test)
-
-        svm_classifier = SVC(kernel='linear', random_state=42)
-        svm_classifier.fit(X_train_scaled, y_train)
-
         y_pred = svm_classifier.predict(X_test_scaled)
 
         accuracy = accuracy_score(y_test, y_pred)
@@ -76,17 +84,14 @@ def train_model(X, y):
         print("Confusion Matrix:")
         print(confusion_mtx)
     else:
-        print("Insufficient samples for stratified splitting. Combine both classes into one for training.")
-        print("Train on all available data.")
-
-        svm_classifier = SVC(kernel='linear', random_state=42)
-        svm_classifier.fit(X_train_scaled, y_train)
+        print("Insufficient samples for stratified splitting. Trained on all available data.")
 
     # Save the trained SVM model and scaler
     model_filename = "svm_model.pkl"
     scaler_filename = "scaler.pkl"
     joblib.dump(svm_classifier, model_filename)
     joblib.dump(scaler, scaler_filename)
+
 
 def analyze_audio(input_audio_path):
     model_filename = "svm_model.pkl"
@@ -105,13 +110,18 @@ def analyze_audio(input_audio_path):
 
     if mfcc_features is not None:
         mfcc_features_scaled = scaler.transform(mfcc_features.reshape(1, -1))
-        prediction = svm_classifier.predict(mfcc_features_scaled)
-        if prediction[0] == 0:
-            print("The input audio is classified as genuine.")
+        probabilities = svm_classifier.predict_proba(mfcc_features_scaled)[0]
+
+        genuine_prob = probabilities[0]
+        deepfake_prob = probabilities[1]
+
+        if deepfake_prob > genuine_prob:
+            print(f"The input audio is classified as deepfake with probability {deepfake_prob:.2f}")
         else:
-            print("The input audio is classified as deepfake.")
+            print(f"The input audio is classified as genuine with probability {genuine_prob:.2f}")
     else:
         print("Error: Unable to process the input audio.")
+
 
 def main():
     genuine_dir = r"./real_audio/"
@@ -121,7 +131,8 @@ def main():
     print("one done")
     X_deepfake, y_deepfake = create_dataset(deepfake_dir, label=1)
     print("two done")
-    # Check if each class has at least two 
+
+    # Check if each class has at least two samples
     if len(X_genuine) < 2 or len(X_deepfake) < 2:
         print("Each class should have at least two samples for stratified splitting.")
         print("Combining both classes into one for training.")
@@ -130,8 +141,10 @@ def main():
     else:
         X = np.vstack((X_genuine, X_deepfake))
         y = np.hstack((y_genuine, y_deepfake))
+
     print("Starting to train")
     train_model(X, y)
+
 
 if __name__ == "__main__":
     main()
