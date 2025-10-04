@@ -1,6 +1,0 @@
-# Build2Break
-Build2Break hackathon repo
-saketh says hi
-
-shreyaas says 67
-navya hi 

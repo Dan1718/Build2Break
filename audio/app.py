@@ -5,6 +5,11 @@ import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import soundfile as sf
+from pathlib import Path
+
+
+
+
 
 def compute_confidence(p1, p2, threshold_high=0.85, threshold_medium=0.65):
     mass_score = (p1 + p2)
@@ -44,7 +49,7 @@ def extract_mfcc_features_from_bytes(file_bytes, n_mfcc=13, n_fft=2048, hop_leng
         return None
 
 
-def analyze_audio_bytes(file_bytes, model_path="svm_model.pkl", scaler_path="scaler.pkl"):
+def analyze_audio_bytes(file_bytes, model_path="./audio/svm_model.pkl", scaler_path="./audio/scaler.pkl"):
     """
     Analyze audio given as raw bytes.
     Returns classification result string.
@@ -53,30 +58,42 @@ def analyze_audio_bytes(file_bytes, model_path="svm_model.pkl", scaler_path="sca
     mfcc_features = extract_mfcc_features_from_bytes(file_bytes)
     if mfcc_features is None:
         return "Error: Unable to process the input audio."
-
-    # Load scaler + transform features
     try:
         scaler = joblib.load(scaler_path)
         mfcc_features_scaled = scaler.transform(mfcc_features.reshape(1, -1))
-    except Exception as e:
-        return f"Error loading scaler: {e}"
-
-    # Load SVM model and predict
-    try:
         svm_classifier = joblib.load(model_path)
+        print("Loaded audio model")
+
+    except Exception as e:
+        print(f"Error loading scaler: {e}")
+
+    try:
+        
         probabilities = svm_classifier.predict_proba(mfcc_features_scaled)[0]
 
         genuine_prob, deepfake_prob = probabilities[0], probabilities[1]
         p1, p2 = sorted([genuine_prob, deepfake_prob], reverse=True)
 
         
-        return (round(deepfake_prob,2),compute_confidence(deepfake_prob,genuine_prob))
+        return (round(deepfake_prob,2),compute_confidence(deepfake_prob,genuine_prob),'explanation')
         
     except Exception as e:
         return f"Error loading model or predicting: {e}"
 
-with open("./deepfake_audio/file12.wav", "rb") as f:
-    audio_bytes = f.read()
+def main():
+    audio_path = Path("../Documents/B2B/Final/DeepFake-Audio-Detection-MFCC/deepfake_audio/file13576.wav")
+    
+    if not audio_path.exists():
+        print(f"File not found: {audio_path}")
+        return
 
-result = analyze_audio_bytes(audio_bytes)
-print(result)
+    
+    file_bytes = audio_path.read_bytes()
+
+
+    result = analyze_audio_bytes(file_bytes)
+    print("Analysis result:", result)
+
+
+if __name__ == "__main__":
+    main()
