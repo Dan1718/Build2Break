@@ -1,21 +1,72 @@
-<!-- web/index.html -->
-<!doctype html>
-<html>
-  <body>
-    <h3>Upload file to analyze</h3>
-    <input id="file" type="file"/>
-    <button id="btn">Upload</button>
-    <pre id="out"></pre>
-    <script>
-      document.getElementById("btn").onclick = async () => {
-        const f = document.getElementById("file").files[0];
-        if (!f) return alert("choose file");
-        const fd = new FormData();
-        fd.append("file", f);
-        const res = await fetch("/analyze", { method: "POST", body: fd });
-        const data = await res.json();
-        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
-      };
-    </script>
-  </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Detector</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <nav class="bg-white shadow-md">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-blue-600">AI Detector</h1>
+    </div>
+  </nav>
+
+  <!-- Main Section -->
+  <main class="flex-grow flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md mt-10 text-center">
+      <h2 class="text-2xl font-semibold mb-6 text-gray-700">Upload a File for AI Detection</h2>
+
+      <div class="space-y-4">
+        <!-- File Type Selection -->
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-2">File type:</label>
+          <select id="fileType" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-400">
+            <option value="text">Text</option>
+            <option value="image">Image</option>
+            <option value="audio">Sound</option>
+            <option value="video">Video</option>
+          </select>
+        </div>
+
+        <!-- File Input -->
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-2">Choose file:</label>
+          <input id="file" type="file" class="w-full border border-gray-300 rounded-md p-2 cursor-pointer focus:ring-2 focus:ring-blue-400">
+        </div>
+
+        <button id="btn" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 transition duration-200">
+          Upload & Analyze
+        </button>
+
+        <pre id="out" class="mt-4 text-left bg-gray-100 p-3 rounded-md text-sm max-h-64 overflow-auto"></pre>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white text-center py-4 text-gray-500 text-sm shadow-inner">
+    © 2025 AI Detector
+  </footer>
+
+  <script>
+    document.getElementById("btn").onclick = async () => {
+      const f = document.getElementById("file").files[0];
+      const type = document.getElementById("fileType").value;
+      if (!f) return alert("Choose a file");
+
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("detectors", type);  // optional: you can later map type to detectors
+
+      const res = await fetch("/analyze", { method: "POST", body: fd });
+      const data = await res.json();
+      document.getElementById("out").textContent = JSON.stringify(data, null, 2);
+    };
+  </script>
+
+</body>
 </html>
