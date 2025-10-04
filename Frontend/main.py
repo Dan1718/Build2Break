@@ -112,6 +112,58 @@ async def analyze_text(file: UploadFile = File(...)) -> Dict:
     
     return [prob,conf,explanation]
 
+VIDEO_SERVICE_URL = "http://localhost:8003/analyze_video"  # Change to your text service URL
+
+
+async def analyze_video(file: UploadFile = File(...)) -> dict:
+
+    ext = file.filename.split(".")[-1].lower()
+    if ext not in ALLOWED_VIDEO_EXTS:
+        raise HTTPException(status_code=400, detail="Unsupported video format")
+
+    
+    try:
+        import tempfile, shutil, os
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp_file:
+            shutil.copyfileobj(file.file, tmp_file)
+            tmp_path = tmp_file.name
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded video: {e}")
+
+    # Send video file to external service
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            with open(tmp_path, "rb") as f:
+                response = await client.post(
+                    VIDEO_SERVICE_URL,
+                    files={"file": (file.filename, f, f"video/{ext}")}
+                )
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        raise HTTPException(status_code=response.status_code, detail=f"Video service error: {response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to contact video service: {e}")
+    finally:
+        # Cleanup temp file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    # Parse response
+    try:
+        result = response.json()
+        prob = result.get("ai_probability")
+        
+        conf = result.get("confidence")
+        explanation = result.get("explanation", "")
+        print(prob,conf,explanation)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Invalid response from video service: {e}")
+
+    return [prob, conf, explanation]
+
 
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...), detectors: Optional[str] = None):

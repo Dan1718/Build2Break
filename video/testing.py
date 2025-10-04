@@ -62,7 +62,8 @@ def main():
         results.append(output)
 
     # Print results as JSON array
-    print(json.dumps(results, indent=2))
+    print(results)
+    return json.dumps(results, indent=2)
 
 if __name__ == "__main__":
     main()

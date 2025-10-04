@@ -6,12 +6,12 @@ import tempfile
 import shutil
 import os
 
-from preprocessor import VideoPreprocessor
-from detectors import VideoDetector
+from video.preprocessor import VideoPreprocessor
+from video.detectors import VideoDetector
 
 app = FastAPI(title="AI Video Detector")
 
-@app.post("/detect")
+@app.post("/analyze_video")
 async def detect_video(file: UploadFile = File(...)):
     """
     Upload a single video file and get AI detection results.
@@ -38,6 +38,9 @@ async def detect_video(file: UploadFile = File(...)):
         if res is None:
             output.update({
                 "status": "error",
+                "ai_probability":1,
+                "confidence":1,
+                "explanation":"1",
                 "details": msg,
                 "processing_time": round(time.time() - start_time, 3)
             })
@@ -48,7 +51,7 @@ async def detect_video(file: UploadFile = File(...)):
         # Run detector
         detector = VideoDetector()
         result = detector.run_detection(frames)
-
+        print(output)
         output.update({
             "status": "success",
             "ai_probability": result["ai_probability"],
