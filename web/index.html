@@ -1,0 +1,21 @@
+<!-- web/index.html -->
+<!doctype html>
+<html>
+  <body>
+    <h3>Upload file to analyze</h3>
+    <input id="file" type="file"/>
+    <button id="btn">Upload</button>
+    <pre id="out"></pre>
+    <script>
+      document.getElementById("btn").onclick = async () => {
+        const f = document.getElementById("file").files[0];
+        if (!f) return alert("choose file");
+        const fd = new FormData();
+        fd.append("file", f);
+        const res = await fetch("/analyze", { method: "POST", body: fd });
+        const data = await res.json();
+        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
+      };
+    </script>
+  </body>
+</html>
