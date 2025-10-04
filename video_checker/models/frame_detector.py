@@ -1,82 +1,117 @@
 # models/frame_detector.py
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader, Dataset
+import cv2
 import numpy as np
-import os
-import timm  # PyTorch Image Models library
-
-class FrameDataset(Dataset):
-    """
-    Dataset wrapper for video frames.
-    Converts frames to PyTorch tensors and normalizes them.
-    """
-    def __init__(self, frames):
-        self.frames = frames
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize((299, 299)),  # Xception input size
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5])
-        ])
-
-    def __len__(self):
-        return len(self.frames)
-
-    def __getitem__(self, idx):
-        frame = self.frames[idx]
-        return self.transform(frame)
-
+import math
 
 class FrameDetector:
     """
-    Frame-based detector using PyTorch Xception.
-    Automatically picks the latest .pth checkpoint for inference.
+    Heuristic frame detector (no ML):
+      - face presence (Haar cascade)
+      - sharpness (Laplacian variance)
+      - color anomaly (HSV skin-like fraction)
+      - blockiness / compression artifacts (FFT-based proxy)
+    Returns (score, face_present) where score in [0.0,1.0]
     """
-    def __init__(self, weights_dir="models"):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # Create Xception model
-        self.model = timm.create_model('xception', pretrained=False, num_classes=1)
-        self.model.to(self.device)
-        self.model.eval()
+    def __init__(self, face_cascade_path=None):
+        if face_cascade_path is None:
+            face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        try:
+            self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
+            if self.face_cascade.empty():
+                self.face_cascade = None
+        except Exception:
+            self.face_cascade = None
 
-        # Locate all .pth files
-        pth_files = [f for f in os.listdir(weights_dir) if f.endswith(".pth")]
-        if not pth_files:
-            raise FileNotFoundError(f"No .pth weights found in {weights_dir}")
+    def _detect_faces(self, frame):
+        try:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if self.face_cascade is None:
+                return []
+            faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(30,30))
+            return list(faces)
+        except Exception:
+            return []
 
-        # Sort and pick the latest version (assumes names like v0, v1, v2.1)
-        def version_key(fname):
-            # Extract version numbers, e.g., v2.1 -> [2,1]
-            ver = fname.replace('.pth','').split('v')[-1]
-            return [int(x) if x.isdigit() else float(x) for x in ver.split('.')]
+    def _sharpness(self, gray):
+        try:
+            v = cv2.Laplacian(gray, cv2.CV_64F).var()
+            # Map variance to [0,1] with a smooth transform
+            s = 1.0 - 1.0 / (1.0 + math.log1p(v + 1e-9))
+            return float(np.clip(s, 0.0, 1.0))
+        except Exception:
+            return 0.5
 
-        latest_file = sorted(pth_files, key=version_key)[-1]
-        path = os.path.join(weights_dir, latest_file)
+    def _color_anomaly(self, frame):
+        try:
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            h, s, v = cv2.split(hsv)
+            mask = ((h > 0) & (h < 25)) & (s > 20) & (v > 40)
+            skin_frac = float(np.count_nonzero(mask)) / (frame.shape[0] * frame.shape[1] + 1e-9)
+            target = 0.1
+            diff = abs(skin_frac - target)
+            score = diff / (0.5 + diff)
+            return float(np.clip(score, 0.0, 1.0))
+        except Exception:
+            return 0.5
 
-        # Load only the latest checkpoint
-        state_dict = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(state_dict)
+    def _blockiness(self, gray):
+        try:
+            f = np.fft.fft2(gray.astype(np.float32))
+            fshift = np.fft.fftshift(f)
+            mag = np.abs(fshift)
+            h, w = mag.shape
+            center_r = int(min(h, w) * 0.08) + 1
+            cy, cx = h//2, w//2
+            yy, xx = np.ogrid[:h, :w]
+            mask_center = (yy - cy)**2 + (xx - cx)**2 <= center_r**2
+            low = mag[mask_center].sum()
+            high = mag[~mask_center].sum() + 1e-9
+            ratio = low / high
+            score = 1.0 - (1.0 / (1.0 + ratio))
+            return float(np.clip(score, 0.0, 1.0))
+        except Exception:
+            return 0.5
 
-    @torch.no_grad()
-    def detect(self, frames):
+    def detect(self, frames, face_sensitive=True):
         """
-        Runs inference on a list of frames.
-        Returns the averaged fake probability score across all frames.
+        frames: list of BGR images (numpy arrays)
+        face_sensitive: if True, detection will look for faces and set face_present accordingly
+        returns (score, face_present)
         """
-        if len(frames) == 0:
-            return 0.0
+        try:
+            if not frames:
+                return 0.0, False
 
-        dataset = FrameDataset(frames)
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+            total = len(frames)
+            step = max(1, total // 30)  # sample up to ~30 frames
+            sample = frames[::step][:30]
 
-        scores = []
-        for batch in loader:
-            batch = batch.to(self.device)
-            output = self.model(batch)
-            probs = torch.sigmoid(output).view(-1)
-            scores.extend(probs.cpu().numpy())
+            scores = []
+            face_present = False
+            for f in sample:
+                try:
+                    gray = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+                except Exception:
+                    continue
 
-        return float(np.mean(scores))
+                faces = self._detect_faces(f) if face_sensitive else []
+                if faces:
+                    face_present = True
+
+                sharp = self._sharpness(gray)
+                color = self._color_anomaly(f)
+                blocky = self._blockiness(gray)
+
+                # Conservative weighted sum tuned to avoid false positives
+                s = 0.35 * blocky + 0.35 * color + 0.30 * sharp
+                scores.append(s)
+
+            if not scores:
+                return 0.0, face_present
+
+            mean_score = float(np.mean(scores))
+            final = float(np.clip(mean_score, 0.0, 1.0))
+            return final, face_present
+        except Exception:
+            return 0.0, False

@@ -1,70 +1,62 @@
 # models/temporal_detector.py
-import os
-import sys
-import torch
+import cv2
 import numpy as np
-
-# Add RAFT repo to path (adjusted for your nested clone)
-sys.path.append(os.path.join(os.path.dirname(video_checker/raft/RAFT), "../raft/RAFT"))
-
-try:
-    from core.raft import RAFT
-    from core.utils.utils import InputPadder
-except ImportError as e:
-    raise ImportError(
-        "Could not import RAFT. Make sure your RAFT clone is in 'video_checker/raft/RAFT'.\n"
-        f"Original error: {e}"
-    )
+import math
 
 class TemporalDetector:
     """
-    Motion-based AI detector using RAFT optical flow.
-    Returns a normalized temporal anomaly score.
+    Temporal detector using OpenCV Farneback optical flow.
+    Returns (temporal_score, magnitudes_list)
+    temporal_score: [0,1], higher -> more anomalous
+    magnitudes_list: mean flow magnitude per pair
     """
-    def __init__(self, weights_path="models/raft-sintel.pth", device=None):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        if not os.path.exists(weights_path):
-            raise FileNotFoundError(f"RAFT weights not found: {weights_path}")
 
-        # Load RAFT model
-        self.model = RAFT()
-        self.model.load_state_dict(torch.load(weights_path, map_location=self.device))
-        self.model.to(self.device)
-        self.model.eval()
+    def __init__(self, pyr_scale=0.5, levels=3, winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0):
+        self.fb_params = dict(
+            pyr_scale=float(pyr_scale),
+            levels=int(levels),
+            winsize=int(winsize),
+            iterations=int(iterations),
+            poly_n=int(poly_n),
+            poly_sigma=float(poly_sigma),
+            flags=int(flags)
+        )
 
-    @torch.no_grad()
     def detect(self, frames):
-        """
-        Computes temporal anomaly score from a list of frames.
-        Returns:
-            score: float [0.0, 1.0]
-            magnitudes: list of float magnitudes for each frame pair
-        """
-        if len(frames) < 2:
+        try:
+            if not frames or len(frames) < 2:
+                return 0.0, []
+
+            total = len(frames)
+            step = max(1, total // 120)  # sample fewer pairs for performance
+            sampled = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in frames[::step]]
+            magnitudes = []
+
+            for i in range(len(sampled) - 1):
+                try:
+                    prev = sampled[i]
+                    nxt = sampled[i+1]
+                    # ensure dtype uint8
+                    prev_u = prev.astype(np.uint8)
+                    nxt_u = nxt.astype(np.uint8)
+                    flow = cv2.calcOpticalFlowFarneback(prev_u, nxt_u, None, **self.fb_params)
+                    mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+                    mean_mag = float(np.mean(mag))
+                    magnitudes.append(mean_mag)
+                except Exception:
+                    continue
+
+            if not magnitudes:
+                return 0.0, []
+
+            mags = np.array(magnitudes)
+            mean_mag = float(mags.mean())
+            std_mag = float(mags.std())
+
+            rel_std = std_mag / (mean_mag + 1e-9)
+            frozenness = math.exp(-mean_mag)  # higher when mean_mag is very small (frozen)
+            raw = 0.6 * (rel_std / (1.0 + rel_std)) + 0.4 * frozenness
+            score = float(np.clip(raw, 0.0, 1.0))
+            return score, magnitudes
+        except Exception:
             return 0.0, []
-
-        magnitudes = []
-
-        for i in range(len(frames)-1):
-            try:
-                im1 = torch.from_numpy(frames[i].transpose(2,0,1)).unsqueeze(0).float().to(self.device) / 255.0
-                im2 = torch.from_numpy(frames[i+1].transpose(2,0,1)).unsqueeze(0).float().to(self.device) / 255.0
-                padder = InputPadder(im1.shape)
-                im1, im2 = padder.pad(im1, im2)
-
-                flow_low, flow_up = self.model(im1, im2, iters=20, test_mode=True)
-                mag = torch.mean(torch.norm(flow_up[0], dim=0)).item()
-                magnitudes.append(mag)
-
-            except Exception as e:
-                print(f"[TemporalDetector] Skipped frame pair {i}-{i+1} due to error: {e}")
-                continue
-
-        if not magnitudes:
-            return 0.0, []
-
-        # Smooth temporal anomaly score: higher motion = lower anomaly
-        mean_mag = np.mean(magnitudes)
-        score = float(np.clip(1 - np.exp(-mean_mag), 0.0, 1.0))
-
-        return score, magnitudes

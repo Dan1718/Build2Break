@@ -3,56 +3,60 @@ import argparse
 import json
 import time
 import traceback
+
 from preprocessor import VideoPreprocessor
 from detectors import VideoDetector
 
 def main():
-    parser = argparse.ArgumentParser(description="AI-Generated Video Detector")
-    parser.add_argument("video_path", type=str, help="Path to the input video")
-    parser.add_argument("--frame_model", type=str, default="models/xception_weights.pth", help="Frame detector weights")
-    parser.add_argument("--raft_model", type=str, default="models/raft-sintel.pth", help="RAFT weights")
+    parser = argparse.ArgumentParser(description="AI-Generated Video Detector (Python 3.13 compatible)")
+    parser.add_argument("video_path", help="Path to input video")
+    parser.add_argument("--resize_w", type=int, default=640, help="Frame resize width (default 640)")
+    parser.add_argument("--resize_h", type=int, default=360, help="Frame resize height (default 360)")
+    parser.add_argument("--max_frames", type=int, default=300, help="Max frames to extract (default 300)")
+    parser.add_argument("--sample_fps", type=float, default=1.0, help="Approx FPS to sample (default 1.0)")
     args = parser.parse_args()
 
-    start_time = time.time()
+    start = time.time()
+    output = {"status": "error", "details": "", "processing_time": None}
 
     try:
-        # Step 1: Preprocess video
-        preprocessor = VideoPreprocessor()
-        frames, status = preprocessor.process(args.video_path)
-
-        if frames is None:
-            # Failed preprocessing
-            result = {
+        pre = VideoPreprocessor(resize=(args.resize_w, args.resize_h),
+                                max_frames=args.max_frames,
+                                sample_fps=args.sample_fps)
+        res, msg = pre.process(args.video_path)
+        if res is None:
+            output.update({
                 "status": "error",
-                "details": status,
-                "processing_time": round(time.time() - start_time, 2)
-            }
-        else:
-            # Step 2: Run detection
-            detector = VideoDetector(frame_model_path=args.frame_model, raft_weights_path=args.raft_model)
-            detection_result = detector.run_detection(frames)
+                "details": msg,
+                "processing_time": round(time.time() - start, 3)
+            })
+            print(json.dumps(output))
+            return
 
-            # Step 3: Prepare output
-            result = {
-                "status": "success",
-                "ai_probability": detection_result["ai_probability"],
-                "confidence": detection_result["confidence"],
-                "frame_score": detection_result["frame_score"],
-                "temporal_score": detection_result["temporal_score"],
-                "explanation": detection_result["explanation"],
-                "processing_time": round(time.time() - start_time, 2)
-            }
+        (frames, metadata), _ = res, msg  # pre.process returns ((frames, metadata), "Success")
+        detector = VideoDetector()
+        result = detector.run_detection(frames)
 
+        output.update({
+            "status": "success",
+            "ai_probability": result["ai_probability"],
+            "confidence": result["confidence"],
+            "frame_score": result["frame_score"],
+            "temporal_score": result["temporal_score"],
+            "face_present": result["face_present"],
+            "explanation": result["explanation"],
+            "metadata": metadata,
+            "processing_time": round(time.time() - start, 3)
+        })
     except Exception as e:
-        # Catch all errors to prevent crash
-        result = {
+        output.update({
             "status": "error",
             "details": f"{str(e)}\n{traceback.format_exc()}",
-            "processing_time": round(time.time() - start_time, 2)
-        }
+            "processing_time": round(time.time() - start, 3)
+        })
 
-    # Step 4: Print single JSON object
-    print(json.dumps(result, indent=4))
+    # Print a single JSON object (always)
+    print(json.dumps(output))
 
 if __name__ == "__main__":
     main()
