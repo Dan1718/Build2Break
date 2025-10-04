@@ -70,13 +70,15 @@ def analyze_audio_bytes(file_bytes, model_path="svm_model.pkl", scaler_path="sca
         p1, p2 = sorted([genuine_prob, deepfake_prob], reverse=True)
 
         
-        return (round(deepfake_prob,2),compute_confidence(deepfake_prob,genuine_prob))
+        return (round(deepfake_prob,2),compute_confidence(deepfake_prob,genuine_prob),'navyblueeueue')
         
     except Exception as e:
         return f"Error loading model or predicting: {e}"
 
-with open("./deepfake_audio/file12.wav", "rb") as f:
-    audio_bytes = f.read()
+if __name__ == '__main__':
 
-result = analyze_audio_bytes(audio_bytes)
-print(result)
+    with open("./deepfake_audio/file12.wav", "rb") as f:
+        audio_bytes = f.read()
+
+    result = analyze_audio_bytes(audio_bytes)
+    print(result)
