@@ -182,7 +182,7 @@ async def analyze(file: UploadFile = File(...), detectors: Optional[str] = None)
 
             print("HII")
             results = await analyze_text(file)
-        return AnalyzeResponse(score=results[0], confidence=results[1],explanation=results[2])
+        return {"score":results[0], "confidence":results[1],"explanation":results[2]}
     except Exception as e: 
         print(f"Exception :{e}")
 
