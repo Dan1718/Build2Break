@@ -6,6 +6,19 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import soundfile as sf
 
+def compute_confidence(p1, p2, threshold_high=0.85, threshold_medium=0.65):
+    mass_score = (p1 + p2)
+    
+    separation_score = abs(p1 - p2)
+    
+    combined_score = mass_score * separation_score
+    
+    if combined_score >= threshold_high:
+        return "High"
+    elif combined_score >= threshold_medium:
+        return "Medium"
+    else:
+        return "Low"
 
 def extract_mfcc_features_from_bytes(file_bytes, n_mfcc=13, n_fft=2048, hop_length=512):
     """
@@ -54,12 +67,11 @@ def analyze_audio_bytes(file_bytes, model_path="svm_model.pkl", scaler_path="sca
         probabilities = svm_classifier.predict_proba(mfcc_features_scaled)[0]
 
         genuine_prob, deepfake_prob = probabilities[0], probabilities[1]
+        p1, p2 = sorted([genuine_prob, deepfake_prob], reverse=True)
 
-        if deepfake_prob > genuine_prob:
-            return f"The input audio is classified as deepfake with probability {deepfake_prob:.2f}"
-        else:
-            return f"The input audio is classified as genuine with probability {genuine_prob:.2f}"
-
+        
+        return (round(deepfake_prob,2),compute_confidence(deepfake_prob,genuine_prob))
+        
     except Exception as e:
         return f"Error loading model or predicting: {e}"
 
