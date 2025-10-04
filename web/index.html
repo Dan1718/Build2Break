@@ -21,8 +21,14 @@
     .accent-bg { background: linear-gradient(90deg, rgba(255,122,24,0.12), rgba(255,122,24,0.06)); }
     /* upload area */
     .upload-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,122,24,0.08); }
+    
     .drop-zone { transition: box-shadow .18s, transform .12s; }
     .drop-zone:hover { transform: translateY(-3px); }
+    .upload-card:hover {
+    box-shadow: 0 0 25px rgba(255, 122, 24, 0.25), 0 0 45px rgba(255, 122, 24, 0.1);
+    border-color: rgba(255, 122, 24, 0.25);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
     .hidden { display:none; }
     /* progress */
     .progress-track { background: rgba(255,255,255,0.04); border-radius: 12px; overflow: hidden; height: 10px; }
@@ -49,16 +55,44 @@
   <header class="w-full py-5 px-6 lg:px-12">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-4">
-        <div class="ico" style="border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9f56); box-shadow:0 6px 18px rgba(255,122,24,0.06);">
-          <!-- placeholder logo -->
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M3 12h18" stroke="#101010" stroke-width="1.5" stroke-linecap="round"></path>
-            <path d="M6 8 L18 8 L12 18 Z" fill="#101010"></path>
-          </svg>
-        </div>
+        <!-- Replace existing placeholder logo with this -->
+<!-- Logo: Symmetrical A-I Badge -->
+<div class="logo-wrap" aria-hidden="false" role="img" title="AI Detector logo" style="display:flex;align-items:center;gap:10px;">
+  <svg class="logo-mark" width="52" height="52" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="grad-single" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff8b3a"/>
+        <stop offset="100%" stop-color="#ff6b00"/>
+      </linearGradient>
+      <filter id="glowSym" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blurOut"/>
+        <feMerge>
+          <feMergeNode in="blurOut"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+
+    <!-- Background circle / badge -->
+    <circle cx="50" cy="50" r="45" fill="#0b0b0b" stroke="rgba(255,255,255,0.05)" stroke-width="2"/>
+
+    <!-- The "A" shape: symmetric triangular A -->
+    <path d="M30,70 L50,25 L70,70 Z" fill="none" stroke="url(#grad-single)" stroke-width="8" filter="url(#glowSym)" stroke-linejoin="round"/>
+
+    <!-- The "I" inside the A: vertical bar down center -->
+    <rect x="47" y="45" width="6" height="25" rx="3" fill="url(#grad-single)" filter="url(#glowSym)"/>
+
+    <!-- Dot at top of I, inside A apex -->
+    <circle cx="50" cy="40" r="4" fill="#ffb980" filter="url(#glowSym)"/>
+
+  </svg>
+
+  
+</div>
+
         <div>
           <h1 class="text-white text-lg font-bold">AI Detector</h1>
-          <div class="text-sm text-gray-400">Detect AI-generated content • local uploads only</div>
+          <div class="text-sm text-gray-400">Detect AI-generated content</div>
         </div>
       </div>
 
@@ -80,7 +114,7 @@
             <h2 class="text-2xl font-extrabold">Upload & Analyze</h2>
             <p class="mt-1 text-sm text-gray-400 max-w-[38ch]">Drag & drop or select a file (text, image, audio, video).</p>
           </div>
-          <div class="text-sm text-gray-400">Upload Test</div>
+          
         </div>
 
         <!-- Drop zone -->
@@ -150,17 +184,22 @@
 
       <!-- RIGHT: info / about / features -->
       <aside class="p-6 rounded-2xl glass">
-        <!-- <div class="mb-6">
+         <div class="mb-6">
           <h3 class="text-xl font-extrabold">About the Detector</h3>
-          <p class="mt-2 text-sm text-gray-400">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Suspendisse potenti.</p>
-        </div> -->
+<p class="mt-2 text-sm text-gray-400 leading-relaxed">
+  The AI Detector is a unified platform that analyzes text, images, audio, and videos to estimate whether they were created by artificial intelligence. 
+  Designed for transparency and education, it helps users, educators, and researchers better understand how generative AI systems behave — and how to spot their fingerprints.
+</p>
+
+        </div> 
 
         <div class="mb-6">
           <h4 class="text-lg font-bold">How it works</h4>
           <ol class="mt-3 text-sm text-gray-400 space-y-2 list-decimal list-inside">
-            <li>Upload a file. The UI detects its type automatically.</li>
-            <li>Backend runs one or more detectors.</li>
-            <li>Results are aggregated and returned as JSON.</li>
+            <li><span class="text-gray-300 font-semibold">Upload any file:</span> Choose a text, image, audio, or video file directly from your device. The system automatically identifies the file type — no need to select manually.</li>
+  <li><span class="text-gray-300 font-semibold">Smart AI analysis:</span> Once uploaded, our detectors analyze the content using specialized models trained to identify whether it was generated by an AI or created by a human.</li>
+  <li><span class="text-gray-300 font-semibold">Real-time feedback:</span> Watch the progress bar as your file is processed. Within a few seconds, you will receive a detailed probability score and confidence level.</li>
+  <li><span class="text-gray-300 font-semibold">Clear and simple results:</span> The system highlights the likelihood of AI generation in easy-to-understand language, so you can interpret results at a glance — no technical background required.</li>
           </ol>
         </div>
 
@@ -170,13 +209,13 @@
             <!-- <li>• Local uploads only (no links).</li> -->
             <li>• Visual preview for media files.</li>
             <li>• Progress & status indicators.</li>
-            <li>• Clean JSON output ready for UI or API consumers.</li>
+            <!-- <li>• Clean JSON output ready for UI or API consumers.</li> -->
           </ul>
         </div>
 
         <div class="mt-6">
           <h5 class="text-sm font-semibold text-gray-400 mb-2">Quick Tips</h5>
-          <div class="text-xs text-gray-500">For demo: upload small files to avoid long detector runtimes. This UI expects your backend at <code class="text-xs">/analyze</code>.</div>
+          <div class="text-xs text-gray-500">For demo: upload small files to avoid long detector runtimes. </code>.</div>
         </div>
       </aside>
 
@@ -184,7 +223,7 @@
   </main>
 
   <footer class="text-center py-6 text-sm text-gray-500">
-    © 2025 AI Detector — Demo • Built for hackathon
+    © 2025 AI Detector — Demo • Built for Build2Break - an OSDG event 
   </footer>
 
   <!-- Script: behavior -->
