@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import uuid, os
 from .utils import save_upload_to_tempfile, run_detector, aggregate_results, confidence_from_prob
-
+import httpx
 class AnalyzeResponse(BaseModel):
     job_id: Optional[str] = None
     score: float
@@ -35,7 +35,8 @@ def index():
         return f.read()
 
 ALLOWED_AUDIO_EXTS = ["mp3", "wav", "ogg", "flac", "m4a"]
-
+ALLOWED_VIDEO_EXTS = ['mp4','mov','mkv']
+ALLOWED_TEXT_EXTS = ['txt']
 def convert_to_wav(file_bytes: bytes, ext: str) -> bytes:
     """
     Convert uploaded audio to WAV if needed.
@@ -76,7 +77,40 @@ async def analyze_audio(file: UploadFile = File(...)) -> Dict:
     
     return (prob,conf,explanation)
 
-async def text
+TEXT_SERVICE_URL = "http://localhost:8002/analyze_text"  # Change to your text service URL
+
+async def analyze_text(file: UploadFile = File(...)) -> Dict:
+    # Ensure it's a text file
+    ext = file.filename.split(".")[-1].lower()
+    if ext not in {"txt", "csv"}:  # Allowed text extensions
+        raise HTTPException(status_code=400, detail="Unsupported text format")
+    
+    text_bytes = await file.read()
+    text_str = text_bytes.decode("utf-8")  # Assuming UTF-8 text
+    
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                TEXT_SERVICE_URL,
+                json={"text": text_str}  # Send text as JSON
+            )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=response.status_code, detail=f"Text service error: {response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to contact text service: {e}")
+
+    # Assuming the text service returns JSON like: {"probability": 0.9, "confidence": "High", "explanation": "..."}
+    try:
+        result = response.json()
+        prob = result.get("probability")
+        conf = result.get("confidence")
+        explanation = result.get("explanation")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Invalid response from text service: {e}")
+    
+    return [prob,conf,explanation]
 
 
 @app.post("/analyze")
@@ -93,6 +127,8 @@ async def analyze(file: UploadFile = File(...), detectors: Optional[str] = None)
         if ext in ALLOWED_VIDEO_EXTS:
             results = await analyze_video(file)
         if ext in ALLOWED_TEXT_EXTS:
+
+            print("HII")
             results = await analyze_text(file)
         return AnalyzeResponse(score=results[0], confidence=results[1],explanation=results[2])
     except Exception as e: 

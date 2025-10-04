@@ -20,8 +20,8 @@ class TextInput(BaseModel):
     text: str
 
 class TextAnalysisResponse(BaseModel):
-    predicted_label: str
-    ai_probability: float
+    explanation: str
+    probability: float
     confidence: str
 
 
@@ -45,10 +45,10 @@ def analyze_text(input: TextInput):
     ai_prob = result["scores"][result["labels"].index("AI-generated")]
     predicted_label = "AI-generated" if ai_prob >= 0.5 else "Human-written"
     confidence = compute_confidence(ai_prob)
-
+    print(ai_prob)
     return TextAnalysisResponse(
-        predicted_label=predicted_label,
-        ai_probability=ai_prob,
+        explanation="explanation",
+        probability=ai_prob,
         confidence=confidence
     )
 
