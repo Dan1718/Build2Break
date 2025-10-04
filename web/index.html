@@ -1,31 +1,404 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Detector</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Detector — Upload</title>
+
+  <!-- Tailwind CDN (for quick prototyping) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* theme overrides */
+    :root{
+      --bg:#070707;
+      --card:#0f0f0f;
+      --muted:#9a9a9a;
+      --accent:#ff7a18; /* orange */
+      --glass: rgba(255,255,255,0.03);
+    }
+    body{ background: linear-gradient(180deg,#030303 0%, #0b0b0b 100%); color:#eee; }
+    .accent { color: var(--accent); }
+    .accent-bg { background: linear-gradient(90deg, rgba(255,122,24,0.12), rgba(255,122,24,0.06)); }
+    /* upload area */
+    .upload-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,122,24,0.08); }
+    .drop-zone { transition: box-shadow .18s, transform .12s; }
+    .drop-zone:hover { transform: translateY(-3px); }
+    .hidden { display:none; }
+    /* progress */
+    .progress-track { background: rgba(255,255,255,0.04); border-radius: 12px; overflow: hidden; height: 10px; }
+    .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #ffb980); transition: width .2s; }
+    /* subtle glass */
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.03); }
+    /* pretty JSON output */
+    pre.pretty { background: #060606; padding: 12px; border-radius: 8px; color:#e6e6e6; overflow:auto; max-height:340px; border:1px solid rgba(255,255,255,0.03); }
+    /* icon circle */
+    .ico { width:56px;height:56px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03); }
+    /* small badges */
+    .badge { background: rgba(255,122,24,0.12); color: var(--accent); padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,122,24,0.12); font-weight:600; font-size:13px; }
+    /* subtle focus */
+    input:focus, button:focus, textarea:focus { outline: none; box-shadow: 0 0 0 4px rgba(255,122,24,0.06); border-radius:8px; }
+    /* responsive adjustments */
+    @media (min-width:1024px){
+      .page-grid { display:grid; grid-template-columns: 560px 1fr; gap:28px; align-items:start; }
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="antialiased font-sans">
 
-  <!-- Navbar -->
-  <nav class="bg-white shadow-md">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-blue-600">AI Detector</h1>
-    </div>
-  </nav>
-
-  <!-- Main Section -->
-  <main class="flex-grow flex items-center justify-center">
-    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md mt-10 text-center">
-      <h2 class="text-2xl font-semibold mb-6 text-gray-700">Upload a File for AI Detection</h2>
-
-      <div class="space-y-4">
-        <!-- File Input -->
+  <!-- NAV -->
+  <header class="w-full py-5 px-6 lg:px-12">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="ico" style="border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9f56); box-shadow:0 6px 18px rgba(255,122,24,0.06);">
+          <!-- placeholder logo -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M3 12h18" stroke="#101010" stroke-width="1.5" stroke-linecap="round"></path>
+            <path d="M6 8 L18 8 L12 18 Z" fill="#101010"></path>
+          </svg>
+        </div>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-2">Choose file (text, image, audio, video):</label>
-          <input id="file" type="file" accept=".txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.mp3,.wav,.mp4,.mov,.avi,.mkv"
-            class="w-full border border-gray-300 rounded-md p-2 cursor-pointer focus:ring-2 focus:ring-blue-400">
+          <h1 class="text-white text-lg font-bold">AI Detector</h1>
+          <div class="text-sm text-gray-400">Detect AI-generated content • local uploads only</div>
+        </div>
+      </div>
+
+      <div class="hidden sm:flex items-center gap-4">
+        <span class="badge">Dark • Black & Orange</span>
+        <div class="text-sm text-gray-400">v0.1 • demo</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-6 lg:px-12 pb-16">
+    <div class="page-grid">
+
+      <!-- LEFT: upload card -->
+      <section class="upload-card p-6 rounded-2xl shadow-lg glass">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-extrabold">Upload & Analyze</h2>
+            <p class="mt-1 text-sm text-gray-400 max-w-[38ch]">Drag & drop or select a file (text, image, audio, video). We only accept local files — no links.</p>
+          </div>
+          <div class="text-sm text-gray-400">Upload Test</div>
         </div>
 
-        <button id="btn" class="w-full bg-blue-600 text-white font-semibol
+        <!-- Drop zone -->
+        <div id="dropZone" class="drop-zone mt-6 p-5 rounded-xl border-dashed border-2 border-transparent" style="border-color:rgba(255,255,255,0.02);">
+          <div class="flex flex-col items-center justify-center gap-4">
+            <div class="ico" aria-hidden>
+              <!-- file SVG -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v12" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M5 22h14a2 2 0 0 0 2-2V7L14 2H6a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2z" stroke="white" stroke-width="1.2" fill="none"/>
+              </svg>
+            </div>
+
+            <div class="text-center">
+              <div id="dropTitle" class="text-white font-semibold text-lg">Drop file here or click to select</div>
+              <div class="text-sm text-gray-400 mt-1">Accepted: <span class="font-medium text-gray-200">.txt .pdf .docx .png .jpg .mp3 .wav .mp4 .mov .avi .mkv</span></div>
+            </div>
+
+            <button id="selectBtn" class="mt-3 px-5 py-2 rounded-md bg-gradient-to-r from-[#ff8b3a] to-[#ff6b00] text-black font-semibold shadow-sm">Select file</button>
+
+            <input id="fileInput" type="file" accept=".txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.mp3,.wav,.mp4,.mov,.avi,.mkv" class="hidden" />
+          </div>
+        </div>
+
+        <!-- file info / preview -->
+        <div id="fileMeta" class="mt-5 hidden">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div id="typeIcon" class="ico"></div>
+              <div>
+                <div id="fileName" class="text-sm font-semibold text-white"></div>
+                <div id="fileTypeLabel" class="text-xs text-gray-400 mt-1"></div>
+              </div>
+            </div>
+
+            <div class="text-sm text-gray-400" id="fileSize"></div>
+          </div>
+
+          <div id="previewArea" class="mt-4"></div>
+
+          <!-- progress -->
+          <div class="mt-4">
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar" style="width:0%"></div>
+            </div>
+            <div class="mt-2 text-sm text-gray-400 flex items-center justify-between">
+              <div id="progressText">Idle</div>
+              <div id="statusBadge" class="text-xs text-gray-400">waiting</div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex gap-3">
+            <button id="uploadBtn" class="flex-1 bg-gradient-to-r from-[#ff8b3a] to-[#ff6b00] py-3 rounded-md text-black font-semibold">Upload & Analyze</button>
+            <button id="clearBtn" class="px-4 py-3 rounded-md border border-gray-700 text-sm text-gray-300">Clear</button>
+          </div>
+        </div>
+
+        <!-- result -->
+        <div id="resultWrap" class="mt-6 hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm text-gray-400">Analysis Result</div>
+            <div id="aggrBadge" class="badge">Awaiting</div>
+          </div>
+          <pre id="out" class="pretty">No results yet.</pre>
+        </div>
+      </section>
+
+      <!-- RIGHT: info / about / features -->
+      <aside class="p-6 rounded-2xl glass">
+        <div class="mb-6">
+          <h3 class="text-xl font-extrabold">About the Detector</h3>
+          <p class="mt-2 text-sm text-gray-400">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Suspendisse potenti.</p>
+        </div>
+
+        <div class="mb-6">
+          <h4 class="text-lg font-bold">How it works</h4>
+          <ol class="mt-3 text-sm text-gray-400 space-y-2 list-decimal list-inside">
+            <li>Upload a file. The UI detects its type automatically.</li>
+            <li>Backend runs one or more detectors.</li>
+            <li>Results are aggregated and returned as JSON.</li>
+          </ol>
+        </div>
+
+        <div>
+          <h4 class="text-lg font-bold">Features</h4>
+          <ul class="mt-3 text-sm text-gray-400 space-y-2">
+            <li>• Local uploads only (no links).</li>
+            <li>• Visual preview for media files.</li>
+            <li>• Progress & status indicators.</li>
+            <li>• Clean JSON output ready for UI or API consumers.</li>
+          </ul>
+        </div>
+
+        <div class="mt-6">
+          <h5 class="text-sm font-semibold text-gray-400 mb-2">Quick Tips</h5>
+          <div class="text-xs text-gray-500">For demo: upload small files to avoid long detector runtimes. This UI expects your backend at <code class="text-xs">/analyze</code>.</div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <footer class="text-center py-6 text-sm text-gray-500">
+    © 2025 AI Detector — Demo • Built for hackathon
+  </footer>
+
+  <!-- Script: behavior -->
+  <script>
+    // Helpers
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const selectBtn = document.getElementById('selectBtn');
+    const fileMeta = document.getElementById('fileMeta');
+    const previewArea = document.getElementById('previewArea');
+    const fileNameEl = document.getElementById('fileName');
+    const fileTypeLabel = document.getElementById('fileTypeLabel');
+    const fileSizeEl = document.getElementById('fileSize');
+    const typeIcon = document.getElementById('typeIcon');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const out = document.getElementById('out');
+    const resultWrap = document.getElementById('resultWrap');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusBadge = document.getElementById('statusBadge');
+    const aggrBadge = document.getElementById('aggrBadge');
+
+    let currentFile = null;
+    let currentFileType = null;
+
+    // Allowed extensions mapping
+    const extMap = {
+      text: ["txt","pdf","doc","docx"],
+      image: ["png","jpg","jpeg","gif"],
+      audio: ["mp3","wav"],
+      video: ["mp4","mov","avi","mkv"]
+    };
+
+    function extToFileType(ext){
+      ext = ext.toLowerCase();
+      if (extMap.text.includes(ext)) return "text";
+      if (extMap.image.includes(ext)) return "image";
+      if (extMap.audio.includes(ext)) return "audio";
+      if (extMap.video.includes(ext)) return "video";
+      return null;
+    }
+
+    function humanFileSize(bytes){
+      if (bytes === 0) return '0 B';
+      const k = 1024, sizes = ['B','KB','MB','GB','TB'];
+      const i = Math.floor(Math.log(bytes)/Math.log(k));
+      return parseFloat((bytes / Math.pow(k,i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function setIconForType(type){
+      const svgMap = {
+        text: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M6 3h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="#ffb380" stroke-width="1.2" fill="none"/><path d="M8 9h8M8 13h8M8 17h5" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`,
+        image: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#ffb380" stroke-width="1.2"/><circle cx="9" cy="9" r="1.6" fill="#fff"/><path d="M21 15l-5-5-8 8" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`,
+        audio: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 16v-8h4l6-4v16l-6-4H4z" stroke="#ffb380" stroke-width="1.2" fill="none"/><path d="M20 8a3 3 0 0 1 0 8" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`,
+        video: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="14" height="14" rx="2" stroke="#ffb380" stroke-width="1.2"/><path d="M21 7v10l-4-5 4-5z" fill="#fff"/></svg>`
+      };
+      typeIcon.innerHTML = `<div class="ico">${svgMap[type] || svgMap.text}</div>`;
+    }
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.boxShadow = '0 10px 30px rgba(255,122,24,0.08)';
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      dropZone.style.boxShadow = '';
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.boxShadow = '';
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+
+    // select button
+    selectBtn.addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', (e)=> {
+      if (e.target.files && e.target.files[0]) handleFileSelect(e.target.files[0]);
+    });
+
+    // Clear
+    clearBtn.addEventListener('click', () => resetState());
+
+    // handle file select
+    function handleFileSelect(file){
+      // ensure it's a local file (can't be a link since file input only)
+      if (!file || !file.name) return alert('Invalid file');
+
+      // detect ext
+      const parts = file.name.split('.');
+      const ext = parts.length>1 ? parts.pop().toLowerCase() : '';
+      const ftype = extToFileType(ext);
+      if (!ftype) return alert('Unsupported file type. Allowed: text/image/audio/video');
+
+      currentFile = file;
+      currentFileType = ftype;
+
+      // show meta block
+      fileMeta.classList.remove('hidden');
+      resultWrap.classList.add('hidden');
+      document.getElementById('dropTitle').textContent = 'File ready to upload';
+      fileNameEl.textContent = file.name;
+      fileSizeEl.textContent = humanFileSize(file.size);
+      fileTypeLabel.textContent = ftype.toUpperCase();
+
+      setIconForType(ftype);
+
+      // preview
+      previewArea.innerHTML = '';
+      if (ftype === 'image') {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'rounded-md mt-3 max-h-48 mx-auto';
+        previewArea.appendChild(img);
+      } else if (ftype === 'audio') {
+        const a = document.createElement('audio');
+        a.controls = true; a.src = URL.createObjectURL(file); a.className='w-full mt-3';
+        previewArea.appendChild(a);
+      } else if (ftype === 'video') {
+        const v = document.createElement('video');
+        v.controls = true; v.src = URL.createObjectURL(file); v.className='w-full mt-3 rounded-md max-h-48';
+        previewArea.appendChild(v);
+      } else {
+        const p = document.createElement('div');
+        p.className = 'mt-3 text-sm text-gray-400';
+        p.textContent = 'Text/document file — preview not available in demo.';
+        previewArea.appendChild(p);
+      }
+
+      // reset progress UI
+      progressBar.style.width = '0%';
+      progressText.textContent = 'Ready';
+      statusBadge.textContent = 'waiting';
+    }
+
+    // reset
+    function resetState(){
+      currentFile = null; currentFileType = null;
+      fileMeta.classList.add('hidden');
+      resultWrap.classList.add('hidden');
+      fileInput.value = '';
+      previewArea.innerHTML = '';
+      progressBar.style.width = '0%';
+      progressText.textContent = 'Idle';
+      statusBadge.textContent = 'waiting';
+      aggrBadge.textContent = 'Awaiting';
+      out.textContent = 'No results yet.';
+      document.getElementById('dropTitle').textContent = 'Drop file here or click to select';
+    }
+
+    // Upload with XHR to show progress
+    uploadBtn.addEventListener('click', () => {
+      if (!currentFile || !currentFileType) return alert('Choose a file first');
+      uploadFile(currentFile, currentFileType);
+    });
+
+    function uploadFile(file, fileType){
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('detectors', fileType); // backend expects 'detectors' optional param
+
+      // create xhr
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/analyze', true);
+      xhr.responseType = 'json';
+
+      // upload progress
+      xhr.upload.onprogress = function(e){
+        if (e.lengthComputable){
+          const percent = Math.round((e.loaded / e.total) * 100);
+          progressBar.style.width = percent + '%';
+          progressText.textContent = `Uploading — ${percent}%`;
+          statusBadge.textContent = 'uploading';
+        }
+      };
+
+      // on load
+      xhr.onload = function(){
+        if (xhr.status >= 200 && xhr.status < 300){
+          const data = xhr.response;
+          // display prettified JSON
+          out.textContent = JSON.stringify(data, null, 2);
+          resultWrap.classList.remove('hidden');
+          aggrBadge.textContent = data.aggregated_confidence || 'Unknown';
+          progressBar.style.width = '100%';
+          progressText.textContent = 'Complete';
+          statusBadge.textContent = 'done';
+        } else {
+          out.textContent = 'Upload failed: ' + xhr.status + ' ' + xhr.statusText;
+          progressText.textContent = 'Error';
+          statusBadge.textContent = 'error';
+          resultWrap.classList.remove('hidden');
+        }
+      };
+
+      xhr.onerror = function(){
+        out.textContent = 'Network error.';
+        progressText.textContent = 'Error';
+        statusBadge.textContent = 'error';
+        resultWrap.classList.remove('hidden');
+      };
+
+      // show running state
+      progressBar.style.width = '4%';
+      progressText.textContent = 'Starting...';
+      statusBadge.textContent = 'starting';
+
+      xhr.send(formData);
+    }
+
+    // init
+    resetState();
+  </script>
+</body>
+</html>
